@@ -1,0 +1,104 @@
+---
+title: "Pactical Machine Learning- Assignment 1"
+author: "Amrutha Varshini"
+date: "July 10, 2017"
+output: html_document
+---
+
+## Summary
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. 
+
+The goal of this project is to predict the manner in which they did the execise.
+
+## Loading Required Packages
+
+```{r , message=FALSE,warning=FALSE}
+library(caret)
+library(randomForest)
+```
+
+## Getting Data
+
+```{r , cache=TRUE,message=FALSE}
+trainURL <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testURL <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+download.file(url=trainURL, destfile="Train.csv")
+download.file(url=testURL, destfile="Test.csv")
+training <- read.csv("Train.csv",row.names=1,na.strings = "")
+testing <- read.csv("Test.csv",row.names=1,na.strings = "NA")
+```
+
+## Data Preprocessing
+
+First we need shall remove the variables that variance close to Zero in  training and testing data.Then we will remove the columns having missing values.We will also remove columns that seems to be irrelevant.
+
+```{r , message=FALSE}
+# Remove variables having near zero covariates
+nzc <- nearZeroVar(training,saveMetrics=TRUE)
+training <- training[,!nzc$nzv]
+testing <- testing[,!nzc$nzv]
+
+# Remove variables with missing values
+training_filterNA <- training[,(colSums(is.na(training)) == 0)]
+testing_filterNA <- testing[,(colSums(is.na(testing)) == 0)]
+
+# Remove unnecessary columns
+colRem_train <- c("user_name","raw_timestamp_part_1","raw_timestamp_part_2","cvtd_timestamp","num_window")
+colRem_test <- c("user_name","raw_timestamp_part_1","raw_timestamp_part_2","cvtd_timestamp","num_window","problem_id")
+training_colRem <- training_filterNA[,!(names(training_filterNA) %in% colRem_train)]
+testing_colRem <- testing_filterNA[,!(names(testing_filterNA) %in% colRem_test)]
+```
+
+We can slipt the training data into Training and Validation data.
+
+```{r  ,message=FALSE}
+inTrain <- createDataPartition(y=training$classe, p=0.7, list=FALSE)
+training_final <- training_colRem[inTrain,]
+validation_final <- training_colRem[-inTrain,]
+cor <- abs(sapply(colnames(training_final[, -ncol(training)]), function(x) cor(as.numeric(training_final[, x]), as.numeric(training_final$classe), method = "spearman")))
+```
+
+We observe that in the Test and Training data sets there are 52 predictors and 1 response. 
+
+On checking the correlations between the predictors and the outcome variable in the new training set, There doesn’t seem to be any predictors strongly correlated with the outcome variable, so linear regression model is not selected. 
+
+Random forest model may be more robust for this data. And in random forests, there is no need for cross-validation or a separate test set to get an unbiased estimate of the test set error. It is estimated internally, during the execution. 
+
+## Fitting Random forest model
+
+We shall now fit the Random forest model on the Training Dataset and check correctness on the Validation Dataset.
+
+```{r ,message=FALSE }
+# Fit rf model
+rfFit <- train(classe ~ ., method = "rf", data = training_final, importance = T, trControl = trainControl(method = "cv", number = 4))
+validation_pred <- predict(rfFit, newdata=validation_final)
+# Check  performance of model
+confusionMatrix(validation_pred,validation_final$classe)
+```
+
+## Plotting the importance of Various Predictors
+
+```{r , message=FALSE}
+imp <- varImp(rfFit)$importance
+varImpPlot(rfFit$finalModel, sort = TRUE, type = 1, pch = 19, col = 1, cex = 1, main = "Importance of the Various Predictors")
+```
+
+From the above analysis we can find that:
+
+1. The random forest algorithm generates a model with accuracy 0.9913. 
+2. The out-of-sample error is 0.9%, which is pretty low.  
+3. The most important variables according to the model fit are ‘yaw_belt’,‘pitch_forearm’,‘pitch_belt’ and ‘roll_belt’.
+
+## Final Prediction
+
+Now we shall use the random forest model to predict on the testing set without the outcome variable and save the prediction output.
+
+```{r , message=FALSE}
+final_pred <- predict(rfFit, newdata=testing_colRem)
+final_pred
+```
+
+## Results
+
+We have fit a Random Forest Model with 4-fold cross validation. And have obtained the above predictions and same has been submitted as the answers of the Quiz.
