@@ -1,3 +1,3 @@
 # PracticalMachineLearning
 
-Link to the html file:  https://amruthavarshinits.github.io/PracticalMachineLearning/
+Link to the html file:  https://amruthavarshinits.github.io/PracticalMachineLearning/PracticalMachineLearning.html
